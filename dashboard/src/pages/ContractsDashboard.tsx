@@ -16,11 +16,14 @@ export function ContractsDashboard() {
   const [contracts, setContracts] = useState<Contract[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [daysFilter, setDaysFilter] = useState(90)
+  const [daysFilter, setDaysFilter] = useState<number | 'all'>(90)
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
-    fetchAPI<Contract[]>(`/contracts/expiring?days=${daysFilter}`)
+    const endpoint = daysFilter === 'all'
+      ? '/contracts'
+      : `/contracts/expiring?days=${daysFilter}`
+    fetchAPI<Contract[]>(endpoint)
       .then(data => {
         setContracts(data)
         setLoading(false)
@@ -72,7 +75,7 @@ export function ContractsDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{filteredContracts.length}</div>
-            <p className="text-xs text-gray-500 mt-1">Next {daysFilter} days</p>
+            <p className="text-xs text-gray-500 mt-1">{daysFilter === 'all' ? 'All contracts' : `Next ${daysFilter} days`}</p>
           </CardContent>
         </Card>
 
@@ -124,36 +127,29 @@ export function ContractsDashboard() {
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              {([30, 60, 90, 180] as number[]).map(days => (
+                <button
+                  key={days}
+                  onClick={() => setDaysFilter(days)}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    daysFilter === days
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {days} Days
+                </button>
+              ))}
               <button
-                onClick={() => setDaysFilter(30)}
+                onClick={() => setDaysFilter('all')}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  daysFilter === 30
+                  daysFilter === 'all'
                     ? 'bg-primary-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                30 Days
-              </button>
-              <button
-                onClick={() => setDaysFilter(60)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  daysFilter === 60
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                60 Days
-              </button>
-              <button
-                onClick={() => setDaysFilter(90)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  daysFilter === 90
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                90 Days
+                All
               </button>
             </div>
           </div>
@@ -165,7 +161,7 @@ export function ContractsDashboard() {
         <CardHeader>
           <CardTitle>Expiring Contracts</CardTitle>
           <CardDescription>
-            {filteredContracts.length} contracts expiring in the next {daysFilter} days
+            {filteredContracts.length} contracts {daysFilter === 'all' ? '(all)' : `expiring in the next ${daysFilter} days`}
           </CardDescription>
         </CardHeader>
         <CardContent>

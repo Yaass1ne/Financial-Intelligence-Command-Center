@@ -6,7 +6,9 @@ import {
   Receipt,
   Bell,
   Zap,
-  MessageSquare
+  MessageSquare,
+  Brain,
+  Lightbulb
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 
@@ -20,6 +22,8 @@ const navigation = [
   { name: 'Invoices & Treasury', href: '/invoices', icon: Receipt },
   { name: 'Alerts & Recommendations', href: '/alerts', icon: Bell },
   { name: 'Simulations', href: '/simulations', icon: Zap },
+  { name: 'Intelligence Hub', href: '/intelligence', icon: Brain },
+  { name: 'Recommendations', href: '/recommendations', icon: Lightbulb },
   { name: 'AI Assistant', href: '/chat', icon: MessageSquare },
 ]
 

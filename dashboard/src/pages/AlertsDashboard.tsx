@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card'
 import { AlertTriangle, TrendingUp, Bell, CheckCircle } from 'lucide-react'
 
+const API_BASE = 'http://localhost:8080'
+
 interface Alert {
   id: string
   type: 'critical' | 'warning' | 'info' | 'success'
@@ -13,69 +15,50 @@ interface Alert {
   timestamp: string
 }
 
+// Map DecisionFusion severity → Alert type
+function severityToType(severity: string): Alert['type'] {
+  switch (severity) {
+    case 'critical': return 'critical'
+    case 'warning': return 'warning'
+    default: return 'info'
+  }
+}
+
 export function AlertsDashboard() {
-  const [alerts] = useState<Alert[]>([
-    {
-      id: '1',
-      type: 'critical',
-      category: 'Budget',
-      title: 'Marketing Department 45% Over Budget',
-      description: 'Marketing has exceeded budget by $2.5M in Q4 2024',
-      recommendation: 'Review marketing spend and implement cost controls. Consider reallocating resources from underutilized departments.',
-      impact: 'High - Affects overall FY budget by 8%',
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: '2',
-      type: 'critical',
-      category: 'Contract',
-      title: '3 Critical Contracts Expiring This Month',
-      description: 'High-value contracts with cloud providers expire in 15 days',
-      recommendation: 'Immediate action required: Schedule renewal negotiations with vendors. Consider multi-year deals for better rates.',
-      impact: 'Critical - $12M annual value at risk',
-      timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: '3',
-      type: 'warning',
-      category: 'Invoice',
-      title: '12 Invoices Overdue >60 Days',
-      description: 'Multiple invoices from key vendors are significantly overdue',
-      recommendation: 'Prioritize payment of critical vendor invoices to maintain relationships. Review payment approval process.',
-      impact: 'Medium - May affect vendor relationships',
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: '4',
-      type: 'warning',
-      category: 'Budget',
-      title: 'IT Department Trending Towards Overspend',
-      description: 'Current burn rate suggests 15% overspend by year-end',
-      recommendation: 'Review IT spending patterns. Consider deferring non-critical projects to Q1 2025.',
-      impact: 'Medium - Projected $800K overspend',
-      timestamp: new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: '5',
-      type: 'info',
-      category: 'Optimization',
-      title: 'Potential Contract Consolidation Opportunity',
-      description: '5 software vendors providing similar services',
-      recommendation: 'Consolidate SaaS subscriptions to single vendor for 25% cost savings ($500K annually).',
-      impact: 'Low - Optimization opportunity',
-      timestamp: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: '6',
-      type: 'success',
-      category: 'Budget',
-      title: 'Operations Department 20% Under Budget',
-      description: 'Operations has maintained efficiency while staying under budget',
-      recommendation: 'Document cost-saving practices for replication in other departments.',
-      impact: 'Positive - $1.2M savings available for reallocation',
-      timestamp: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(),
-    },
-  ])
+  const [alerts, setAlerts] = useState<Alert[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/fusion/decisions?limit=20`)
+        if (res.ok) {
+          const data = await res.json()
+          const decisions = data.decisions ?? []
+          const mapped: Alert[] = decisions.map((d: any) => ({
+            id: d.id,
+            type: severityToType(d.severity),
+            category: d.source,
+            title: d.title,
+            description: d.description,
+            recommendation: d.recommended_action,
+            impact: d.financial_impact_eur > 0
+              ? `Financial impact: ${d.financial_impact_eur.toLocaleString()} EUR`
+              : `Priority score: ${d.priority_score.toFixed(0)}`,
+            timestamp: new Date().toISOString(),
+          }))
+          setAlerts(mapped.length > 0 ? mapped : FALLBACK_ALERTS)
+        } else {
+          setAlerts(FALLBACK_ALERTS)
+        }
+      } catch {
+        setAlerts(FALLBACK_ALERTS)
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
 
   const criticalCount = alerts.filter(a => a.type === 'critical').length
   const warningCount = alerts.filter(a => a.type === 'warning').length
@@ -83,27 +66,19 @@ export function AlertsDashboard() {
 
   const getAlertIcon = (type: string) => {
     switch (type) {
-      case 'critical':
-        return <AlertTriangle className="w-5 h-5 text-red-500" />
-      case 'warning':
-        return <Bell className="w-5 h-5 text-yellow-500" />
-      case 'success':
-        return <CheckCircle className="w-5 h-5 text-green-500" />
-      default:
-        return <TrendingUp className="w-5 h-5 text-blue-500" />
+      case 'critical': return <AlertTriangle className="w-5 h-5 text-red-500" />
+      case 'warning': return <Bell className="w-5 h-5 text-yellow-500" />
+      case 'success': return <CheckCircle className="w-5 h-5 text-green-500" />
+      default: return <TrendingUp className="w-5 h-5 text-blue-500" />
     }
   }
 
   const getAlertStyle = (type: string) => {
     switch (type) {
-      case 'critical':
-        return 'border-red-500 bg-red-50'
-      case 'warning':
-        return 'border-yellow-500 bg-yellow-50'
-      case 'success':
-        return 'border-green-500 bg-green-50'
-      default:
-        return 'border-blue-500 bg-blue-50'
+      case 'critical': return 'border-red-500 bg-red-50'
+      case 'warning': return 'border-yellow-500 bg-yellow-50'
+      case 'success': return 'border-green-500 bg-green-50'
+      default: return 'border-blue-500 bg-blue-50'
     }
   }
 
@@ -115,6 +90,14 @@ export function AlertsDashboard() {
     const days = Math.floor(hours / 24)
     if (days === 1) return '1 day ago'
     return `${days} days ago`
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500">Loading alerts...</div>
+      </div>
+    )
   }
 
   return (
@@ -204,7 +187,7 @@ export function AlertsDashboard() {
             <CardContent>
               <div className="space-y-3">
                 <div className="bg-white rounded-lg p-4 border border-gray-200">
-                  <h4 className="font-semibold text-sm text-gray-900 mb-2">💡 Recommendation</h4>
+                  <h4 className="font-semibold text-sm text-gray-900 mb-2">Recommendation</h4>
                   <p className="text-sm text-gray-700">{alert.recommendation}</p>
                 </div>
                 <div className="flex items-center justify-between text-sm">
@@ -223,3 +206,40 @@ export function AlertsDashboard() {
     </div>
   )
 }
+
+// ============================================
+// Fallback data (shown when API is unavailable)
+// ============================================
+
+const FALLBACK_ALERTS: Alert[] = [
+  {
+    id: '1',
+    type: 'critical',
+    category: 'Budget',
+    title: 'Marketing Department 45% Over Budget',
+    description: 'Marketing has exceeded budget by $2.5M in Q4 2024',
+    recommendation: 'Review marketing spend and implement cost controls. Consider reallocating resources from underutilized departments.',
+    impact: 'High - Affects overall FY budget by 8%',
+    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: '2',
+    type: 'critical',
+    category: 'Contract',
+    title: '3 Critical Contracts Expiring This Month',
+    description: 'High-value contracts with cloud providers expire in 15 days',
+    recommendation: 'Immediate action required: Schedule renewal negotiations with vendors.',
+    impact: 'Critical - $12M annual value at risk',
+    timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: '3',
+    type: 'warning',
+    category: 'Invoice',
+    title: '12 Invoices Overdue >60 Days',
+    description: 'Multiple invoices from key vendors are significantly overdue',
+    recommendation: 'Prioritize payment of critical vendor invoices to maintain relationships.',
+    impact: 'Medium - May affect vendor relationships',
+    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+  },
+]

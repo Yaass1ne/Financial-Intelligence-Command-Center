@@ -34,6 +34,11 @@ class FinancialGraph:
             "CREATE CONSTRAINT IF NOT EXISTS FOR (b:Budget) REQUIRE b.id IS UNIQUE",
             "CREATE CONSTRAINT IF NOT EXISTS FOR (cl:Client) REQUIRE cl.name IS UNIQUE",
             "CREATE CONSTRAINT IF NOT EXISTS FOR (v:Vendor) REQUIRE v.name IS UNIQUE",
+            "CREATE CONSTRAINT IF NOT EXISTS FOR (m:EpisodicMemory) REQUIRE m.id IS UNIQUE",
+            "CREATE CONSTRAINT IF NOT EXISTS FOR (w:WeakSignal) REQUIRE w.id IS UNIQUE",
+            "CREATE CONSTRAINT IF NOT EXISTS FOR (r:Recommendation) REQUIRE r.id IS UNIQUE",
+            "CREATE CONSTRAINT IF NOT EXISTS FOR (s:Scenario) REQUIRE s.id IS UNIQUE",
+            "CREATE CONSTRAINT IF NOT EXISTS FOR (p:Prediction) REQUIRE p.id IS UNIQUE",
         ]
         
         with self.driver.session() as session:
@@ -121,12 +126,13 @@ class FinancialGraph:
           AND i.due_date IS NOT NULL
           AND i.due_date < date()
           AND duration.inDays(i.due_date, date()).days >= $days
+        WITH i, duration.inDays(i.due_date, date()).days AS raw_days
         RETURN i.id AS invoice_id,
                toString(i.date) AS date,
                i.vendor AS vendor,
                i.amount AS amount,
                i.status AS status,
-               duration.inDays(i.due_date, date()).days AS days_overdue
+               CASE WHEN raw_days > 365 THEN 365 ELSE raw_days END AS days_overdue
         ORDER BY days_overdue DESC
         """
 
@@ -392,6 +398,216 @@ class FinancialGraph:
             'auto_renewal': data.get('auto_renewal', data.get('auto_renew', False))
         }
         self.create_contract(contract_data)
+
+    # ============================================
+    # EpisodicMemory Node Operations
+    # ============================================
+
+    def create_episodic_memory_node(self, pattern_data: Dict[str, Any]):
+        """Create or update an EpisodicMemory node."""
+        query = """
+        MERGE (m:EpisodicMemory {id: $id})
+        SET m.type = $type,
+            m.subject = $subject,
+            m.description = $description,
+            m.confidence = $confidence,
+            m.evidence_count = $evidence_count,
+            m.last_updated = $last_updated
+        RETURN m
+        """
+        with self.driver.session() as session:
+            session.run(query, **pattern_data)
+
+    def get_episodic_memories(self, pattern_type: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Return stored episodic memory patterns."""
+        if pattern_type:
+            query = """
+            MATCH (m:EpisodicMemory {type: $type})
+            RETURN m.id AS id, m.type AS type, m.subject AS subject,
+                   m.description AS description, m.confidence AS confidence,
+                   m.evidence_count AS evidence_count, m.last_updated AS last_updated
+            ORDER BY m.confidence DESC
+            """
+            with self.driver.session() as session:
+                result = session.run(query, type=pattern_type)
+                return [dict(r) for r in result]
+        else:
+            query = """
+            MATCH (m:EpisodicMemory)
+            RETURN m.id AS id, m.type AS type, m.subject AS subject,
+                   m.description AS description, m.confidence AS confidence,
+                   m.evidence_count AS evidence_count, m.last_updated AS last_updated
+            ORDER BY m.confidence DESC
+            """
+            with self.driver.session() as session:
+                result = session.run(query)
+                return [dict(r) for r in result]
+
+    # ============================================
+    # WeakSignal Node Operations
+    # ============================================
+
+    def create_weak_signal_node(self, signal_data: Dict[str, Any]):
+        """Create a WeakSignal node."""
+        query = """
+        MERGE (w:WeakSignal {id: $id})
+        SET w.score = $score,
+            w.signals_json = $signals_json,
+            w.detected_at = $detected_at,
+            w.acknowledged = $acknowledged
+        RETURN w
+        """
+        with self.driver.session() as session:
+            session.run(query, **signal_data)
+
+    def get_weak_signals(self, only_active: bool = True) -> List[Dict[str, Any]]:
+        """Return active weak signal clusters."""
+        query = """
+        MATCH (w:WeakSignal)
+        WHERE w.acknowledged = false OR NOT $only_active
+        RETURN w.id AS id, w.score AS score, w.signals_json AS signals_json,
+               w.detected_at AS detected_at, w.acknowledged AS acknowledged
+        ORDER BY w.score DESC
+        """
+        with self.driver.session() as session:
+            result = session.run(query, only_active=only_active)
+            return [dict(r) for r in result]
+
+    # ============================================
+    # Recommendation Node Operations
+    # ============================================
+
+    def create_recommendation_node(self, rec_data: Dict[str, Any]):
+        """Create or update a Recommendation node."""
+        query = """
+        MERGE (r:Recommendation {id: $id})
+        SET r.category = $category,
+            r.title = $title,
+            r.description = $description,
+            r.priority_score = $priority_score,
+            r.expected_impact_eur = $expected_impact_eur,
+            r.confidence = $confidence,
+            r.supporting_evidence = $supporting_evidence,
+            r.created_at = $created_at,
+            r.acknowledged = $acknowledged
+        RETURN r
+        """
+        with self.driver.session() as session:
+            session.run(query, **rec_data)
+
+    def get_recommendations(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """Return top recommendations sorted by priority."""
+        query = """
+        MATCH (r:Recommendation)
+        RETURN r.id AS id, r.category AS category, r.title AS title,
+               r.description AS description, r.priority_score AS priority_score,
+               r.expected_impact_eur AS expected_impact_eur, r.confidence AS confidence,
+               r.supporting_evidence AS supporting_evidence, r.created_at AS created_at,
+               r.acknowledged AS acknowledged
+        ORDER BY r.priority_score DESC
+        LIMIT $limit
+        """
+        with self.driver.session() as session:
+            result = session.run(query, limit=limit)
+            return [dict(r) for r in result]
+
+    def acknowledge_recommendation(self, rec_id: str):
+        """Mark a recommendation as acknowledged."""
+        query = "MATCH (r:Recommendation {id: $id}) SET r.acknowledged = true"
+        with self.driver.session() as session:
+            session.run(query, id=rec_id)
+
+    # ============================================
+    # Prediction Node Operations (Feedback Loop)
+    # ============================================
+
+    def create_prediction_node(self, pred_data: Dict[str, Any]):
+        """Create a Prediction node."""
+        query = """
+        MERGE (p:Prediction {id: $id})
+        SET p.entity_type = $entity_type,
+            p.entity_id = $entity_id,
+            p.metric = $metric,
+            p.predicted_value = $predicted_value,
+            p.actual_value = $actual_value,
+            p.error_pct = $error_pct,
+            p.timestamp = $timestamp,
+            p.reindexed = $reindexed
+        RETURN p
+        """
+        with self.driver.session() as session:
+            session.run(query, **pred_data)
+
+    def get_predictions(self, entity_type: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Return prediction records."""
+        if entity_type:
+            query = """
+            MATCH (p:Prediction {entity_type: $entity_type})
+            RETURN p.id AS id, p.entity_type AS entity_type, p.entity_id AS entity_id,
+                   p.metric AS metric, p.predicted_value AS predicted_value,
+                   p.actual_value AS actual_value, p.error_pct AS error_pct,
+                   p.timestamp AS timestamp, p.reindexed AS reindexed
+            ORDER BY p.timestamp DESC
+            """
+            with self.driver.session() as session:
+                result = session.run(query, entity_type=entity_type)
+                return [dict(r) for r in result]
+        else:
+            query = """
+            MATCH (p:Prediction)
+            RETURN p.id AS id, p.entity_type AS entity_type, p.entity_id AS entity_id,
+                   p.metric AS metric, p.predicted_value AS predicted_value,
+                   p.actual_value AS actual_value, p.error_pct AS error_pct,
+                   p.timestamp AS timestamp, p.reindexed AS reindexed
+            ORDER BY p.timestamp DESC
+            """
+            with self.driver.session() as session:
+                result = session.run(query)
+                return [dict(r) for r in result]
+
+    # ============================================
+    # Raw Data Access Helpers (for intelligence modules)
+    # ============================================
+
+    def get_all_invoices_raw(self) -> List[Dict[str, Any]]:
+        """Return all invoices with raw fields for analysis."""
+        query = """
+        MATCH (i:Invoice)
+        WITH i, CASE WHEN i.due_date IS NOT NULL
+                     THEN duration.inDays(i.due_date, date()).days
+                     ELSE 0 END AS raw_days
+        RETURN i.id AS invoice_id, i.vendor AS vendor, i.amount AS amount,
+               i.status AS status,
+               CASE WHEN raw_days > 365 THEN 365 ELSE raw_days END AS days_overdue
+        """
+        with self.driver.session() as session:
+            result = session.run(query)
+            return [dict(r) for r in result]
+
+    def get_all_budgets_raw(self) -> List[Dict[str, Any]]:
+        """Return all budget nodes for analysis."""
+        query = """
+        MATCH (b:Budget)
+        RETURN b.department AS department, b.year AS year,
+               b.budget AS budget, b.actual AS actual, b.variance AS variance
+        """
+        with self.driver.session() as session:
+            result = session.run(query)
+            return [dict(r) for r in result]
+
+    def get_all_contracts_raw(self) -> List[Dict[str, Any]]:
+        """Return all contracts with days_until_expiry for analysis."""
+        query = """
+        MATCH (c:Contract)
+        RETURN c.id AS contract_id, c.vendor AS vendor,
+               c.annual_value AS annual_value,
+               CASE WHEN c.end_date IS NOT NULL
+                    THEN duration.inDays(date(), c.end_date).days
+                    ELSE 999 END AS days_until_expiry
+        """
+        with self.driver.session() as session:
+            result = session.run(query)
+            return [dict(r) for r in result]
 
     def create_budget_node(self, budget_item: Dict[str, Any]):
         """
