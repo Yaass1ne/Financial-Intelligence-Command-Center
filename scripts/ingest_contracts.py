@@ -52,6 +52,7 @@ def parse_contract(text: str, filename: str) -> dict:
 
     # Vendor / Party names
     vendor = find([
+        r"LENDER[:\s]+([A-Z][^\n,\.]{3,60})",
         r"(?:between|party\s*1|vendor|supplier|service\s*provider)[:\s]+([A-Z][^\n,]{3,50})",
         r"(?:company|firm|corporation)[:\s]+([A-Z][^\n,]{3,50})",
     ])
@@ -69,6 +70,7 @@ def parse_contract(text: str, filename: str) -> dict:
 
     # Value
     value_str = find([
+        r"FINANCED\s+AMOUNT[:\s]+[\$€£]?\s*([\d,\.]+)",
         r"(?:total\s*value|contract\s*value|annual\s*value|amount)[:\s]+[\$€£]?\s*([\d,\.]+)",
         r"[\$€£]\s*([\d,\.]+)\s*(?:per\s*year|annually|\/yr)",
     ], "0")
