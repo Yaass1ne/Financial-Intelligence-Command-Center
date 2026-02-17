@@ -75,7 +75,7 @@ def parse_contract(text: str, filename: str) -> dict:
         r"[\$€£]\s*([\d,\.]+)\s*(?:per\s*year|annually|\/yr)",
     ], "0")
     try:
-        annual_value = float(value_str.replace(",", "").replace(" ", ""))
+        annual_value = float(value_str.replace(",", "").replace(" ", "").rstrip("."))
     except ValueError:
         annual_value = 0.0
 
