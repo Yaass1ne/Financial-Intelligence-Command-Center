@@ -132,7 +132,7 @@ class FinancialGraph:
                i.vendor AS vendor,
                i.amount AS amount,
                i.status AS status,
-               CASE WHEN raw_days > 365 THEN 365 ELSE raw_days END AS days_overdue
+               raw_days AS days_overdue
         ORDER BY days_overdue DESC
         """
 
