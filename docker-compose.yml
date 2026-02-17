@@ -1,0 +1,107 @@
+version: '3.8'
+
+services:
+  # Neo4j - Graph Database for RAG
+  neo4j:
+    image: neo4j:5.15-community
+    container_name: fincenter-neo4j
+    ports:
+      - "7474:7474"  # HTTP
+      - "7687:7687"  # Bolt
+    environment:
+      - NEO4J_AUTH=neo4j/fincenter2024
+      - NEO4J_PLUGINS=["apoc", "graph-data-science"]
+      - NEO4J_dbms_memory_heap_max__size=2G
+      - NEO4J_dbms_memory_pagecache_size=1G
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - neo4j_import:/var/lib/neo4j/import
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL - Relational Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: fincenter-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=fincenter
+      - POSTGRES_PASSWORD=fincenter2024
+      - POSTGRES_DB=fincenter
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fincenter"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis - Cache & Session Store
+  redis:
+    image: redis:7-alpine
+    container_name: fincenter-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass fincenter2024 --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Optional: Celery Worker (for background tasks)
+  # celery-worker:
+  #   build: .
+  #   container_name: fincenter-celery
+  #   command: celery -A src.tasks worker --loglevel=info
+  #   depends_on:
+  #     - redis
+  #     - postgres
+  #   environment:
+  #     - CELERY_BROKER_URL=redis://:fincenter2024@redis:6379/0
+  #     - CELERY_RESULT_BACKEND=redis://:fincenter2024@redis:6379/0
+  #   volumes:
+  #     - .:/app
+  #   restart: unless-stopped
+
+  # Optional: Flower (Celery monitoring)
+  # flower:
+  #   build: .
+  #   container_name: fincenter-flower
+  #   command: celery -A src.tasks flower --port=5555
+  #   ports:
+  #     - "5555:5555"
+  #   depends_on:
+  #     - redis
+  #     - celery-worker
+  #   environment:
+  #     - CELERY_BROKER_URL=redis://:fincenter2024@redis:6379/0
+  #     - CELERY_RESULT_BACKEND=redis://:fincenter2024@redis:6379/0
+  #   restart: unless-stopped
+
+volumes:
+  neo4j_data:
+    driver: local
+  neo4j_logs:
+    driver: local
+  neo4j_import:
+    driver: local
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  default:
+    name: fincenter-network

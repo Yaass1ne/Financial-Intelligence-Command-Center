@@ -1,0 +1,63 @@
+# Environment variables — NEVER commit this
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.eggs/
+pip-wheel-metadata/
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+*.coverage
+
+# Generated data — too large for git
+data/
+dataprocessed/
+
+# Vector store index files (regenerate with load_neo4j.py)
+*.faiss
+*.pkl
+
+# Logs
+*.log
+server.log
+logs/
+
+# Node.js
+dashboard/node_modules/
+dashboard/.cache/
+dashboard/dist/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+nul
+
+# Claude Code internals
+.claude/
+CLAUDE.md
+SKILLS.md
+
+# Temporary files
+*.tmp
+*.bak
+{data*
+
+# IDE
+.vscode/
+.idea/
+*.swp
