@@ -24,7 +24,7 @@ export function ChatDashboard() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: "Hello! I'm FINCENTER's AI assistant powered by Llama 3.3 70B via Groq.\n\nI have access to your live financial data — budgets, invoices, contracts, episodic memory patterns, weak signals, and decision fusion alerts. Ask me anything!",
+      content: "Hello! I'm F360's AI assistant powered by Llama 3.3 70B via Groq.\n\nI have access to your live financial data — budgets, invoices, contracts, episodic memory patterns, weak signals, and decision fusion alerts. Ask me anything!",
       timestamp: new Date(),
     },
   ])
@@ -91,7 +91,7 @@ export function ChatDashboard() {
             <CardHeader className="border-b pb-3">
               <div className="flex items-center gap-2">
                 <Bot className="w-5 h-5 text-purple-600" />
-                <CardTitle className="text-lg">FINCENTER Assistant</CardTitle>
+                <CardTitle className="text-lg">F360 Assistant</CardTitle>
                 <span className="ml-auto text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded-full font-medium">
                   llama-3.3-70b-versatile
                 </span>

@@ -41,7 +41,7 @@ export function Layout({ children }: LayoutProps) {
                 <span className="text-white font-bold text-xl">F</span>
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">FINCENTER</h1>
+                <h1 className="text-2xl font-bold text-gray-900">F360</h1>
                 <p className="text-sm text-gray-500">Financial Intelligence Command Center</p>
               </div>
             </div>
