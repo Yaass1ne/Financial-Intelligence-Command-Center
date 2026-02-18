@@ -6,7 +6,6 @@ Each recommendation has a priority_score (0–100) computed from
 financial impact, urgency, and confidence.
 """
 
-import uuid
 from datetime import datetime
 from typing import List, Dict, Any
 
@@ -81,7 +80,7 @@ class RecommendationEngine:
                     score = self._priority_score(financial, urgency, confidence)
 
                     recs.append({
-                        "id": f"rec_cost_{b.get('department', 'dept')}_{uuid.uuid4().hex[:6]}",
+                        "id": f"rec_cost_{b.get('department', 'dept')}",
                         "category": "cost_reduction",
                         "title": f"Reduce spend in {b.get('department', '?')} department",
                         "description": (
@@ -109,7 +108,7 @@ class RecommendationEngine:
                     continue
                 score = self._priority_score(0.5, 0.6, p.get("confidence", 0.7))
                 recs.append({
-                    "id": f"rec_overbilling_{p['subject'].replace(' ', '_')}_{uuid.uuid4().hex[:6]}",
+                    "id": f"rec_overbilling_{p['subject'].replace(' ', '_')}",
                     "category": "cost_reduction",
                     "title": f"Renegotiate contract with {p.get('subject', '?')}",
                     "description": p.get("description", ""),
@@ -140,7 +139,7 @@ class RecommendationEngine:
                 score = self._priority_score(financial, urgency, confidence)
 
                 recs.append({
-                    "id": f"rec_contract_{c.get('contract_id', 'ctr')}_{uuid.uuid4().hex[:6]}",
+                    "id": f"rec_contract_{c.get('contract_id', 'ctr')}",
                     "category": "risk_mitigation",
                     "title": f"Renew contract: {c.get('vendor', '?')}",
                     "description": (
@@ -172,7 +171,7 @@ class RecommendationEngine:
                 score = self._priority_score(financial, urgency, confidence)
 
                 recs.append({
-                    "id": f"rec_invoice_{inv.get('invoice_id', 'inv')}_{uuid.uuid4().hex[:6]}",
+                    "id": f"rec_invoice_{inv.get('invoice_id', 'inv')}",
                     "category": "risk_mitigation",
                     "title": f"Resolve overdue invoice: {inv.get('vendor', '?')}",
                     "description": (
@@ -197,7 +196,7 @@ class RecommendationEngine:
                 max_score = max(s.get("score", 0) for s in signals)
                 score = self._priority_score(min(max_score / 10, 1.0), 0.7, 0.75)
                 recs.append({
-                    "id": f"rec_weaksignal_{uuid.uuid4().hex[:8]}",
+                    "id": "rec_weaksignal_cluster",
                     "category": "risk_mitigation",
                     "title": "Financial stress cluster requires holistic review",
                     "description": (
@@ -232,7 +231,7 @@ class RecommendationEngine:
                     financial = min(1.0, savings / 300_000)
                     score = self._priority_score(financial, 0.4, 0.80)
                     recs.append({
-                        "id": f"rec_reallocate_{b.get('department', 'dept')}_{uuid.uuid4().hex[:6]}",
+                        "id": f"rec_reallocate_{b.get('department', 'dept')}",
                         "category": "revenue_optimization",
                         "title": f"Reallocate surplus from {b.get('department', '?')}",
                         "description": (
