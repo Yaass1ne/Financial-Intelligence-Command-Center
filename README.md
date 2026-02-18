@@ -46,20 +46,20 @@ Replaces 10–15 disconnected financial tools with a single intelligent platform
 │  PDF / Excel / JSON / CSV  ←── Active (ingestion pipeline)           │
 │  S3 / Kafka / SharePoint / API ←── Connectors implemented, not wired │
 │  Audio / Video / Images / IoT  ←── Stubs in connectors.py            │
-└──────────────┬─────────────────────────────────┬────────────────────┘
-               │                                 │
-               ▼                                 ▼
-┌──────────────────────────┐     ┌───────────────────────────────────┐
-│   COGNITIVE INGESTION     │     │       REAL-TIME FEEDBACK          │
-│  pipeline.py              │     │  feedback/loop.py                 │
-│  parsers: PDF/Excel/JSON  │     │  • record_prediction()            │
-│  extractors: NER/amounts  │◄───►│  • record_actual() → error %      │
-│  validators: dedup/QA     │     │  • re-index if error > 20%        │
-└──────────────┬────────────┘     └───────────────────────────────────┘
+└──────────────────────────────┬───────────────────────────────────────┘
+                               │
+                               ▼
+┌──────────────────────────┐       ┌───────────────────────────────────┐
+│   COGNITIVE INGESTION     │       │       REAL-TIME FEEDBACK          │
+│  pipeline.py              │◄─────►│  feedback/loop.py                 │
+│  parsers: PDF/Excel/JSON  │       │  • Calcul Écart Prévu/Réel        │
+│  extractors: NER/amounts  │       │  • record_actual() → error %      │
+│  validators: dedup/QA     │       │  • Ré-Indexation si erreur > 20%  │
+└──────────────┬────────────┘       └───────────────────────────────────┘
                │
                ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│                           RAGraph (Neo4j + FAISS)                     │
+│                        RAGraph (Neo4j + FAISS)                        │
 │                                                                       │
 │   memory/episodic.py          rag/orchestrator.py    llm/groq_client  │
 │   • vendor_overbilling        • vector search        • Llama-3.3-70B  │
@@ -68,25 +68,28 @@ Replaces 10–15 disconnected financial tools with a single intelligent platform
 │   • seasonal_spike            • LLM reasoning                         │
 └──────────────┬────────────────────────────────────────────────────────┘
                │
-       ┌───────┴────────┐
-       ▼                ▼
-┌─────────────┐   ┌──────────────────────────────────────────────┐
-│  SIMULATION  │   │              DECISION FUSION                  │
-│  budget.py   │   │  decision_fusion.py                          │
-│  cashflow.py │   │  • budget overruns                           │
-│  monte_carlo │   │  • overdue invoices                          │
-│  ai_scenarios│   │  • expiring contracts                        │
-│  (Groq LLM)  │   │  • episodic patterns                         │
-└─────────────┘   │  • weak signals                              │
-                   └─────────────────────┬────────────────────────┘
-                                         │
-                                         ▼
-               ┌─────────────────────────────────────────────────┐
-               │          API DE RECOMMANDATION                    │
-               │  recommendations/engine.py                        │
-               │  intelligence/weak_signals.py                     │
-               │  Dashboard: 8 pages (React + Recharts)            │
-               └─────────────────────────────────────────────────┘
+               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                       SCÉNARIO SIMULATION                            │
+│  simulation/budget.py      simulation/cashflow.py                    │
+│  simulation/monte_carlo.py simulation/ai_scenarios.py (Groq LLM)    │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                        DECISION FUSION                               │
+│  intelligence/decision_fusion.py — Agrégation Multi-sources          │
+│  intelligence/weak_signals.py   — Corrélation d'Indices Faibles      │
+│  • budget overruns  • overdue invoices  • expiring contracts         │
+│  • episodic patterns  • weak signal clusters                         │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    API DE RECOMMANDATION                              │
+│  recommendations/engine.py  — scored & ranked recommendations        │
+│  Dashboard: 8 pages (React + Recharts + Tailwind)                    │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---

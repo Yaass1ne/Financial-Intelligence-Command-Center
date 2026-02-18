@@ -154,11 +154,30 @@ class FeedbackLoop:
     # ============================================
 
     def _trigger_reindex(self, entity_id: str) -> bool:
-        """Re-embed a document in the VectorStore."""
+        """Re-embed a document in the VectorStore when prediction error exceeds threshold."""
         if not self.vectorstore:
             return False
         try:
-            # Mark for re-indexing — actual re-embed is async in production
+            # Fetch the entity text from Neo4j and re-embed in FAISS
+            predictions = self.graph.get_predictions()
+            pred = next((p for p in predictions if p.get("entity_id") == entity_id), None)
+            if not pred:
+                return False
+            entity_type = pred.get("entity_type", "unknown")
+            text = (
+                f"{entity_type} entity {entity_id} reindexed after prediction error "
+                f"exceeding {REINDEX_THRESHOLD_PCT}%"
+            )
+            self.vectorstore.add_document(
+                doc_id=f"reindex_{entity_id}",
+                text=text,
+                metadata={
+                    "entity_id": entity_id,
+                    "entity_type": entity_type,
+                    "reindexed_at": datetime.utcnow().isoformat(),
+                    "source": "feedback_loop",
+                },
+            )
             return True
         except Exception:
             return False
