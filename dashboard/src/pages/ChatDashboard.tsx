@@ -10,10 +10,13 @@ interface Message {
 }
 
 const EXAMPLE_QUESTIONS = [
-  "Which department is most over budget?",
-  "How many invoices are overdue by more than 60 days?",
-  "What is the total value of contracts expiring this quarter?",
-  "Which vendor has the highest outstanding invoice?",
+  "Which vendor is overbilling us based on episodic memory?",
+  "What weak financial signals should I be worried about right now?",
+  "Which department has been consistently overspending for multiple years?",
+  "What are the top priority recommendations to reduce costs?",
+  "Which contracts are expiring soon and what is their total value?",
+  "Are there any late payment patterns with our vendors?",
+  "What does decision fusion say about our biggest financial risk today?",
   "Summarize the budget performance across all departments.",
 ]
 
@@ -21,7 +24,7 @@ export function ChatDashboard() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: "Hello! I'm FINCENTER's AI assistant powered by Llama 3.3 70B via Groq.\n\nI have access to your live financial data — budgets, invoices, and contracts. Ask me anything!",
+      content: "Hello! I'm FINCENTER's AI assistant powered by Llama 3.3 70B via Groq.\n\nI have access to your live financial data — budgets, invoices, contracts, episodic memory patterns, weak signals, and decision fusion alerts. Ask me anything!",
       timestamp: new Date(),
     },
   ])
@@ -205,7 +208,19 @@ export function ChatDashboard() {
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-purple-500 rounded-full" />
-                <span>50 Contracts</span>
+                <span>80 Contracts</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full" />
+                <span>Episodic Memory</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-red-500 rounded-full" />
+                <span>Weak Signal Radar</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-indigo-500 rounded-full" />
+                <span>Decision Fusion</span>
               </div>
             </CardContent>
           </Card>

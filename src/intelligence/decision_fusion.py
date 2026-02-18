@@ -35,17 +35,24 @@ class DecisionFusion:
         Returns:
             List of ranked decision dicts sorted by priority_score desc
         """
-        decisions = []
+        # Collect from each source, cap per-source to ensure diversity
+        PER_SOURCE_CAP = 5
+        all_decisions: List[Dict[str, Any]] = []
 
-        decisions += self._budget_decisions()
-        decisions += self._invoice_decisions()
-        decisions += self._contract_decisions()
-        decisions += self._episodic_decisions()
-        decisions += self._weak_signal_decisions()
+        for source_fn in [
+            self._invoice_decisions,
+            self._budget_decisions,
+            self._contract_decisions,
+            self._episodic_decisions,
+            self._weak_signal_decisions,
+        ]:
+            items = source_fn()
+            items.sort(key=lambda d: d["priority_score"], reverse=True)
+            all_decisions += items[:PER_SOURCE_CAP]
 
-        # Sort by priority score descending
-        decisions.sort(key=lambda d: d["priority_score"], reverse=True)
-        return decisions[:limit]
+        # Global sort and return top N
+        all_decisions.sort(key=lambda d: d["priority_score"], reverse=True)
+        return all_decisions[:limit]
 
     # ============================================
     # Signal Sources

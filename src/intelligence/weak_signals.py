@@ -5,7 +5,7 @@ Correlates below-threshold signals from multiple financial sources to detect
 hidden financial stress that would not trigger individual alerts.
 """
 
-import uuid
+import hashlib
 import json
 from datetime import datetime
 from typing import List, Dict, Any
@@ -48,7 +48,17 @@ class WeakSignalDetector:
         if score < STRESS_THRESHOLD:
             return []
 
-        signal_id = f"ws_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+        # Use a stable content-based ID so re-runs don't create duplicates
+        content = json.dumps(sorted(
+            [f"{s['type']}:{s['subject']}" for s in signals_found]
+        ))
+        signal_id = "ws_" + hashlib.md5(content.encode()).hexdigest()[:12]
+
+        # Check if this exact cluster already exists (unacknowledged)
+        existing = self.graph.get_weak_signals(only_active=True)
+        if any(r.get("id") == signal_id for r in existing):
+            return [{"id": signal_id, "score": score, "signals": signals_found, "already_exists": True}]
+
         signal_data = {
             "id": signal_id,
             "score": score,
@@ -125,6 +135,16 @@ class WeakSignalDetector:
             pass
 
         return signals
+
+    def detect_signals(self) -> List[Dict[str, Any]]:
+        """Return current signals as a live computation (no DB write). Used by orchestrator."""
+        signals = self._collect_signals()
+        if not signals:
+            return []
+        score = sum(s["weight"] for s in signals)
+        if score < STRESS_THRESHOLD:
+            return []
+        return [{"score": score, "signals": [f"{s['subject']} — {s['detail']}" for s in signals]}]
 
     def get_active_signals(self) -> List[Dict[str, Any]]:
         """Return all active (unacknowledged) weak signal clusters."""

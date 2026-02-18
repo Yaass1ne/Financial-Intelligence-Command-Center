@@ -53,21 +53,29 @@ export function SimulationsDashboard() {
   // Base budget data
   const baseMonthlyBudget = 1000000 // $1M per month
 
-  // Generate simulation data
+  // Seasonal multipliers — Q4 spike, Q1 dip, summer slowdown
+  const SEASONAL = [0.88, 0.91, 0.97, 1.02, 1.05, 0.98, 0.93, 0.95, 1.04, 1.08, 1.12, 1.24]
+
+  // Generate simulation data with realistic variation
   const generateSimulationData = () => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     const data = months.map((month, index) => {
-      const baseline = baseMonthlyBudget
-      const withCuts = baseline * (1 - budgetCut / 100)
-      const withInflation = baseline * (1 + (inflationRate / 100) * (index / 12))
-      const withGrowth = baseline * (1 + (revenueGrowth / 100) * (index / 12))
+      const seasonal = SEASONAL[index]
+      const monthlyInflation = Math.pow(1 + inflationRate / 100, (index + 1) / 12)
+      const monthlyGrowth   = Math.pow(1 + revenueGrowth  / 100, (index + 1) / 12)
+      const cutFactor = 1 - (budgetCut / 100)
+
+      const baseline      = baseMonthlyBudget * seasonal
+      const withCuts      = baseline * cutFactor
+      const withInflation = baseline * monthlyInflation
+      const optimized     = baseline * cutFactor * monthlyGrowth * 0.97  // cuts + efficiency gain
 
       return {
         month,
-        baseline: baseline / 1000,
-        withCuts: withCuts / 1000,
-        withInflation: withInflation / 1000,
-        optimized: (withCuts * 0.95 + withGrowth * 0.05) / 1000,
+        baseline:      Math.round(baseline      / 1000),
+        withCuts:      Math.round(withCuts       / 1000),
+        withInflation: Math.round(withInflation  / 1000),
+        optimized:     Math.round(optimized      / 1000),
       }
     })
     return data
@@ -366,7 +374,7 @@ export function SimulationsDashboard() {
             <LineChart data={simulationData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" />
-              <YAxis label={{ value: 'Budget ($K)', angle: -90, position: 'insideLeft' }} />
+              <YAxis domain={['auto', 'auto']} label={{ value: 'Budget ($K)', angle: -90, position: 'insideLeft' }} />
               <Tooltip formatter={(value: number) => `$${value.toFixed(0)}K`} />
               <Legend />
               <Line

@@ -29,18 +29,24 @@ class RAGOrchestrator:
     financial graph enrichment.
     """
 
-    def __init__(self, graph, vectorstore, llm_fn, memory=None):
+    def __init__(self, graph, vectorstore, llm_fn, memory=None, decision_fusion=None, weak_signals=None, recommendations=None):
         """
         Args:
-            graph:       FinancialGraph instance (Neo4j)
-            vectorstore: VectorStore instance (FAISS embeddings)
-            llm_fn:      Callable(question, context) -> str  (e.g. groq_client.answer_question)
-            memory:      EpisodicMemory instance (optional, for pattern injection)
+            graph:           FinancialGraph instance (Neo4j)
+            vectorstore:     VectorStore instance (FAISS embeddings)
+            llm_fn:          Callable(question, context) -> str
+            memory:          EpisodicMemory instance (optional)
+            decision_fusion: DecisionFusion instance (optional)
+            weak_signals:    WeakSignalDetector instance (optional)
+            recommendations: RecommendationEngine instance (optional)
         """
         self.graph = graph
         self.vectorstore = vectorstore
         self.llm_fn = llm_fn
         self.memory = memory
+        self.decision_fusion = decision_fusion
+        self.weak_signals = weak_signals
+        self.recommendations = recommendations
 
     # ============================================
     # Public Query Interface
@@ -118,7 +124,16 @@ class RAGOrchestrator:
         context_parts: List[str] = []
         sources: List[Dict[str, Any]] = []
 
-        # Graph context (synchronous Neo4j queries)
+        # Always inject a compact financial health snapshot
+        try:
+            snapshot = self._financial_snapshot()
+            if snapshot:
+                context_parts.append(snapshot)
+                sources.append({"type": "graph", "id": "snapshot"})
+        except Exception:
+            pass
+
+        # Graph context — keyword-based deep enrichment
         try:
             graph_context = self._graph_context_sync(question)
             if graph_context:
@@ -127,13 +142,44 @@ class RAGOrchestrator:
         except Exception:
             pass
 
-        # Episodic memory
+        # Episodic memory — always injected
         if self.memory:
             try:
                 mem = self.memory.get_context_for_ai()
                 if mem:
                     context_parts.append(mem)
                     sources.append({"type": "memory", "id": "episodic"})
+            except Exception:
+                pass
+
+        # Decision fusion — always injected (top 5 ranked risks)
+        if self.decision_fusion:
+            try:
+                fusion_ctx = self._decision_fusion_context()
+                if fusion_ctx:
+                    context_parts.append(fusion_ctx)
+                    sources.append({"type": "intelligence", "id": "decision_fusion"})
+            except Exception:
+                pass
+
+        # Weak signals — injected when relevant keywords detected
+        q_lower = question.lower()
+        if self.weak_signals and any(w in q_lower for w in ["signal", "risk", "stress", "weak", "alert", "concern", "worry"]):
+            try:
+                ws_ctx = self._weak_signals_context()
+                if ws_ctx:
+                    context_parts.append(ws_ctx)
+                    sources.append({"type": "intelligence", "id": "weak_signals"})
+            except Exception:
+                pass
+
+        # Recommendations — injected when relevant keywords detected
+        if self.recommendations and any(w in q_lower for w in ["recommend", "suggest", "should", "action", "reduce", "optimize", "improve", "priority", "cost", "saving", "top"]):
+            try:
+                rec_ctx = self._recommendations_context()
+                if rec_ctx:
+                    context_parts.append(rec_ctx)
+                    sources.append({"type": "intelligence", "id": "recommendations"})
             except Exception:
                 pass
 
@@ -146,6 +192,94 @@ class RAGOrchestrator:
             "sources": sources,
             "vector_hits": 0,
         }
+
+    # ============================================
+    # Always-on Financial Health Snapshot
+    # ============================================
+
+    def _financial_snapshot(self) -> str:
+        """Compact summary of key financial metrics — always injected into LLM context."""
+        lines = ["FINANCIAL HEALTH SNAPSHOT (live data):"]
+        try:
+            budgets = self.graph.get_all_budgets_raw()
+            unique_depts = set(b.get("department") for b in budgets if b.get("department"))
+            over = [b for b in budgets if (b.get("actual") or 0) > (b.get("budget") or 0)]
+            over_depts = set(b.get("department") for b in over if b.get("department"))
+            total_variance = sum((b.get("actual", 0) or 0) - (b.get("budget", 0) or 0) for b in over)
+            lines.append(
+                f"  Budgets: {len(unique_depts)} departments, "
+                f"{len(over_depts)} with at least one year over budget "
+                f"(total overrun across all years: {total_variance:+,.0f} EUR)"
+            )
+            # Surface persistent overspenders explicitly for the LLM
+            dept_years_over: Dict[str, int] = {}
+            for b in over:
+                d = b.get("department", "")
+                dept_years_over[d] = dept_years_over.get(d, 0) + 1
+            persistent = [(d, y) for d, y in dept_years_over.items() if y >= 2]
+            if persistent:
+                persistent.sort(key=lambda x: -x[1])
+                lines.append(
+                    "  Departments overspending for 2+ years: "
+                    + ", ".join(f"{d} ({y} yrs)" for d, y in persistent)
+                )
+        except Exception:
+            pass
+        try:
+            invoices = self.graph.get_all_invoices_raw()
+            overdue = [i for i in invoices if (i.get("days_overdue") or 0) > 0]
+            overdue_value = sum(i.get("amount", 0) or 0 for i in overdue)
+            lines.append(f"  Invoices: {len(overdue)} overdue ({overdue_value:,.0f} EUR outstanding)")
+        except Exception:
+            pass
+        try:
+            contracts = self.graph.get_all_contracts_raw()
+            expiring_90 = [c for c in contracts if 0 < (c.get("days_until_expiry") or 999) <= 90]
+            lines.append(f"  Contracts: {len(contracts)} total, {len(expiring_90)} expiring within 90 days")
+        except Exception:
+            pass
+        return "\n".join(lines) if len(lines) > 1 else ""
+
+    def _decision_fusion_context(self) -> str:
+        """Top 5 ranked decisions from decision fusion engine."""
+        decisions = self.decision_fusion.get_ranked_decisions(limit=5)
+        if not decisions:
+            return ""
+        lines = ["DECISION FUSION — TOP FINANCIAL RISKS (ranked by priority score):"]
+        for d in decisions:
+            lines.append(
+                f"  [{d.get('severity','').upper()}] {d.get('title','?')} "
+                f"(score: {d.get('priority_score', 0):.1f}, "
+                f"impact: {d.get('financial_impact_eur', 0):,.0f} EUR) "
+                f"— {d.get('recommended_action','')}"
+            )
+        return "\n".join(lines)
+
+    def _weak_signals_context(self) -> str:
+        """Active weak signal clusters."""
+        signals = self.weak_signals.detect_signals()
+        if not signals:
+            return ""
+        lines = ["WEAK SIGNAL RADAR — ACTIVE STRESS CLUSTERS:"]
+        for s in signals[:5]:
+            lines.append(
+                f"  Score {s.get('score', 0):.1f}: {', '.join(s.get('signals', []))}"
+            )
+        return "\n".join(lines)
+
+    def _recommendations_context(self) -> str:
+        """Top 5 recommendations by priority score."""
+        recs = self.recommendations.generate_recommendations()
+        if not recs:
+            return ""
+        lines = ["TOP RECOMMENDATIONS (by priority score):"]
+        for r in recs[:5]:
+            lines.append(
+                f"  [{r.get('category','?')}] {r.get('title','?')} "
+                f"(priority: {r.get('priority_score', 0):.0f}/100, "
+                f"impact: {r.get('expected_impact_eur', 0):,.0f} EUR)"
+            )
+        return "\n".join(lines)
 
     # ============================================
     # Step 1: Semantic Vector Search
@@ -186,22 +320,31 @@ class RAGOrchestrator:
         q_lower = question.lower()
 
         # Budget context
-        if any(w in q_lower for w in ["budget", "spend", "dépense", "overspend", "variance"]):
+        if any(w in q_lower for w in ["budget", "spend", "dépense", "overspend", "variance", "department", "performance", "summarize", "summary"]):
             try:
                 budgets = self.graph.get_all_budgets_raw()
                 if budgets:
+                    unique_depts = set(b.get("department") for b in budgets if b.get("department"))
                     over = [b for b in budgets if (b.get("actual") or 0) > (b.get("budget") or 0)]
-                    lines = [f"LIVE BUDGET DATA ({len(budgets)} departments):"]
-                    for b in budgets[:8]:
-                        variance = (b.get("actual") or 0) - (b.get("budget") or 0)
+                    lines = [f"LIVE BUDGET DATA ({len(unique_depts)} departments, {len(budgets)} budget rows across all years):"]
+                    # Aggregate by department
+                    dept_totals: Dict[str, Dict] = {}
+                    for b in budgets:
+                        d = b.get("department", "?")
+                        if d not in dept_totals:
+                            dept_totals[d] = {"budget": 0, "actual": 0, "years_over": 0}
+                        dept_totals[d]["budget"] += b.get("budget", 0) or 0
+                        dept_totals[d]["actual"] += b.get("actual", 0) or 0
+                        if (b.get("actual") or 0) > (b.get("budget") or 0):
+                            dept_totals[d]["years_over"] += 1
+                    for dept, totals in sorted(dept_totals.items()):
+                        variance = totals["actual"] - totals["budget"]
                         lines.append(
-                            f"  {b.get('department','?')}: "
-                            f"budget={b.get('budget',0):,.0f}, "
-                            f"actual={b.get('actual',0):,.0f}, "
-                            f"variance={variance:+,.0f}"
+                            f"  {dept}: total budget={totals['budget']:,.0f}, "
+                            f"actual={totals['actual']:,.0f}, "
+                            f"variance={variance:+,.0f} "
+                            f"({totals['years_over']} year(s) over budget)"
                         )
-                    if over:
-                        lines.append(f"  → {len(over)} departments over budget")
                     parts.append("\n".join(lines))
             except Exception:
                 pass
@@ -224,20 +367,69 @@ class RAGOrchestrator:
             except Exception:
                 pass
 
+        # Vendor / quarterly aggregation context
+        if any(w in q_lower for w in ["vendor", "q1", "q2", "q3", "q4", "quarter", "biggest", "largest", "top vendor", "supplier"]):
+            try:
+                # Detect which quarter is being asked about
+                quarter_map = {"q1": (1, 3), "q2": (4, 6), "q3": (7, 9), "q4": (10, 12),
+                               "first quarter": (1, 3), "second quarter": (4, 6),
+                               "third quarter": (7, 9), "fourth quarter": (10, 12)}
+                month_start, month_end = 1, 12  # default: full year
+                quarter_label = "full year"
+                for kw, (ms, me) in quarter_map.items():
+                    if kw in q_lower:
+                        month_start, month_end = ms, me
+                        quarter_label = kw.upper()
+                        break
+
+                query = """
+                MATCH (i:Invoice)
+                WHERE i.date IS NOT NULL
+                  AND i.date.month >= $month_start
+                  AND i.date.month <= $month_end
+                RETURN i.vendor AS vendor,
+                       count(i) AS invoice_count,
+                       sum(i.amount) AS total_amount
+                ORDER BY total_amount DESC
+                LIMIT 10
+                """
+                with self.graph.driver.session() as session:
+                    result = session.run(query, month_start=month_start, month_end=month_end)
+                    rows = [dict(r) for r in result]
+
+                if rows:
+                    lines = [f"VENDOR TOTALS ({quarter_label}, by invoice amount):"]
+                    for r in rows:
+                        lines.append(
+                            f"  {r.get('vendor','?')}: "
+                            f"{r.get('total_amount', 0):,.0f} EUR "
+                            f"({r.get('invoice_count', 0)} invoices)"
+                        )
+                    parts.append("\n".join(lines))
+            except Exception:
+                pass
+
         # Contract context
         if any(w in q_lower for w in ["contract", "contrat", "expir", "vendor", "fournisseur"]):
             try:
                 contracts = self.graph.get_all_contracts_raw()
-                expiring = [c for c in contracts if 0 < (c.get("days_until_expiry") or 999) <= 90]
-                if expiring:
-                    lines = [f"EXPIRING CONTRACTS (<90 days, {len(expiring)} total):"]
-                    for c in expiring[:5]:
+                active = [c for c in contracts if (c.get("days_until_expiry") or 9999) > 0]
+                expiring_soon = [c for c in active if (c.get("days_until_expiry") or 9999) <= 365]
+                total_value = sum(c.get("annual_value", 0) or 0 for c in active)
+                lines = [
+                    f"CONTRACTS ({len(active)} active, total annual value: {total_value:,.0f} EUR):"
+                ]
+                if expiring_soon:
+                    lines.append(f"  Expiring within 365 days ({len(expiring_soon)} contracts):")
+                    for c in sorted(expiring_soon, key=lambda x: x.get("days_until_expiry", 999))[:8]:
                         lines.append(
-                            f"  {c.get('vendor','?')}: "
+                            f"    {c.get('vendor','?')}: "
                             f"{c.get('annual_value',0):,.0f} EUR/yr, "
                             f"expires in {c.get('days_until_expiry','?')} days"
                         )
-                    parts.append("\n".join(lines))
+                else:
+                    lines.append("  No contracts expiring within 365 days.")
+                parts.append("\n".join(lines))
             except Exception:
                 pass
 

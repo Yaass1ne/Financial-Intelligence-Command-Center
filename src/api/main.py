@@ -49,6 +49,7 @@ class InvoiceResponse(BaseModel):
     vendor: str
     amount: float
     status: str
+    days_overdue: int = 0
 
 
 class SearchRequest(BaseModel):
@@ -99,15 +100,20 @@ async def lifespan(app: FastAPI):
 
     # Initialize intelligence modules
     app.state.memory = EpisodicMemory(app.state.graph)
+    app.state.weak_signals = WeakSignalDetector(app.state.graph)
+    app.state.decision_fusion = DecisionFusion(app.state.graph)
+    app.state.recommendations = RecommendationEngine(app.state.graph)
+
+    # Re-wire RAG orchestrator with intelligence modules now available
     app.state.rag = RAGOrchestrator(
         graph=app.state.graph,
         vectorstore=app.state.vectorstore,
         llm_fn=answer_question,
         memory=app.state.memory,
+        decision_fusion=app.state.decision_fusion,
+        weak_signals=app.state.weak_signals,
+        recommendations=app.state.recommendations,
     )
-    app.state.weak_signals = WeakSignalDetector(app.state.graph)
-    app.state.decision_fusion = DecisionFusion(app.state.graph)
-    app.state.recommendations = RecommendationEngine(app.state.graph)
     app.state.feedback = FeedbackLoop(app.state.graph, app.state.vectorstore)
     app.state.ai_scenarios = AIScenarioGenerator(app.state.graph)
 
