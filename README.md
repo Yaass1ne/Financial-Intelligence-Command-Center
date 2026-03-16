@@ -1,9 +1,23 @@
 # FINCENTER — Financial Intelligence Command Center
 
-> AI-powered platform that centralizes, analyzes, and visualizes enterprise financial data using a knowledge graph, vector search, episodic memory, and a large language model.
+> AI platform that replaces 10–15 disconnected financial tools with a single intelligent system powered by RAG, a knowledge graph, episodic memory, and LLM reasoning.
 
-**Version:** 0.2.0 &nbsp;|&nbsp; **Updated:** 2026-02-17 &nbsp;|&nbsp; **Status:** All 7 architecture blocks implemented
+![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
+![Neo4j](https://img.shields.io/badge/Neo4j-008CC1?style=flat-square&logo=neo4j&logoColor=white)
+![React](https://img.shields.io/badge/React-61DAFB?style=flat-square&logo=react&logoColor=black)
+![Groq](https://img.shields.io/badge/Groq_Llama_3.3_70B-FF6B35?style=flat-square)
 
+**Version:** 0.2.0 | **Status:** All 7 architecture blocks implemented
+
+### What it does
+- Natural language Q&A over financial data (RAG + Groq Llama 3.3 70B)
+- Budget variance tracking, overdue invoices, contract expiry alerts
+- Monte Carlo simulations + AI-generated scenarios
+- Episodic memory that learns patterns (vendor overbilling, seasonal spikes)
+- Decision fusion engine ranking tactical actions by priority score
+
+---
 ---
 
 ## Table of Contents
